@@ -1,0 +1,81 @@
+---
+title: "Data Audit"
+output: slidy_presentation
+---
+
+```{r,echo=FALSE}
+require(data.table)
+require(ggplot2)
+require(DT)
+require(corrplot)
+require(GGally)
+
+
+dades<-fread("../01-kagel-liberty/Data/train.csv")
+
+# summary(dades)
+# str(dades)
+# sapply(dades,class)
+
+ind_numeric     <- sapply(dades,class) %in% c("numeric","integer")
+Numerical       <- dades[,ind_numeric,with=F] # pillem nomes numeriques
+ind_num_or_cat  <- sapply(dades,function(x) {length(unique(x))<50})  #quants valors pren cada categoria?
+ind_categorical <- !ind_numeric | ind_num_or_cat
+Categorical     <- dades[,ind_categorical,with=F] # pillem nomes categoricas
+
+# Categorical-----
+a <- sapply(Categorical,function(x) { sum(is.null(x)|is.na(x))}) # quans nulls hi ha?
+categorical_audit <- as.data.frame(t(a)) ; rownames(categorical_audit) <- "Nulls"
+a <- sapply(Categorical,function(x) { round(sum(is.null(x)|is.na(x))/length(x),3) })  #i en percentatge?
+categorical_audit <- rbind(categorical_audit,a) ; rownames(categorical_audit)[nrow(categorical_audit)] <- "porcentage_Nulls"
+a <- sapply(Categorical,function(x) {length(unique(x))})  #quants valors pren cada categoria?
+categorical_audit <- rbind(categorical_audit,a) ; rownames(categorical_audit)[nrow(categorical_audit)] <- "valores_unicos"
+a <- sapply(Categorical,function(x) {names(sort(table(x,exclude=NULL),decreasing=TRUE)[1])})  #i la moda??
+categorical_audit <- rbind(categorical_audit,a) ; rownames(categorical_audit)[nrow(categorical_audit)] <- "Moda"
+
+# Numerical----
+a <- sapply(Numerical,function(x) { sum(is.null(x)|is.na(x))}) # quans nulls hi ha?
+numerical_audit <- as.data.frame(t(a)) ; rownames(numerical_audit) <- "Nulls"
+a <- sapply(Numerical,function(x) { round(sum(is.null(x)|is.na(x))/length(x),3) })#i en percentatge?
+numerical_audit <- rbind(numerical_audit,a) ; rownames(numerical_audit)[nrow(numerical_audit)] <- "porcentage_Nulls"
+a <-data.frame(matrix(as.numeric(unlist(sapply(summary(Numerical),strsplit,":")) [seq(2,2*ncol(Numerical)*6,2)]), 6))
+names(a) <- names(numerical_audit) ; rownames(a)<-unlist( sapply(summary(Numerical)[,1],strsplit,":"))[seq(1,12,2)]
+numerical_audit <- rbind(numerical_audit,a ) 
+a <- round(sapply(Numerical,sd,na.rm = T),3)  # so whatever!!!!
+numerical_audit <- rbind(numerical_audit,a) ; rownames(numerical_audit)[nrow(numerical_audit)] <- "standarDeviation"
+
+```
+
+## Slide with Plot
+
+```{r, echo=FALSE}
+datatable(t(categorical_audit))
+
+datatable(t(numerical_audit))
+```
+
+## Slide with Plot
+
+```{r, echo=FALSE}
+
+for(i in 1:ncol(Categorical)){ plot(qplot(Categorical[,get(names(Categorical)[i])],xlab=names(Categorical)[i])+scale_x_discrete())} #let's superlot
+```
+
+## Slide with Plot
+
+```{r, echo=FALSE}
+
+for(i in 1:ncol(Numerical)){plot( ggplot(data=Numerical)+geom_histogram(aes_string( x=names(Numerical)[i]) ) ) }
+```
+
+## Slide with Plot
+
+```{r, echo=FALSE}
+
+corrplot(cor(Numerical),order="hclust")
+
+```
+
+
+
+

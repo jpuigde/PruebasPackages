@@ -1,0 +1,234 @@
+---
+title: "Untitled"
+author: "Jordi Puigdellivol"
+date: "8 de enero de 2016"
+output: html_document
+---
+
+# Stadistical Test
+```{r, echo=FALSE}
+library(ggplot2)
+```
+
+## Introductio
+
+
+
+In this document we will try to understand how, when different tests works and which one to use in different situations, also tries to make a document to explain it in a easy way through examples.
+As long as this is a personal document, it can contain a lot of errors, be free to let mi know them ^^.
+
+
+
+we will try to understant 3 diferentnt test, in a basic level and implement them in R.
+
+ - [Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test)
+ - [Student's t-test](https://en.wikipedia.org/wiki/Student%27s_t-test)
+ - [Chi-squared test](https://en.wikipedia.org/wiki/Chi-squared_test)
+
+Also to exploit it's wekneses. We will test them in 5 diferent distributions or convinations of them to try to get wrong results.
+
+ - [Normal distribution](https://en.wikipedia.org/wiki/Normal_distribution)
+ - [Uniform distribution](https://en.wikipedia.org/wiki/Uniform_distribution_(continuous))
+ - [Exponential distribution](https://en.wikipedia.org/wiki/Exponential_distribution)
+ - [Log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution)
+ - [Logistic distribution](https://en.wikipedia.org/wiki/Logistic_distribution)
+
+all this distributions has parameters.
+
+we will try to make a the test with in 3 diferent ways with the relation between parameters.
+
+ - same paramaters
+ - close parameters
+ - very different parameters
+ 
+so let's start!!!
+
+# What is A/B testing
+
+## A/B testing
+
+[A/B testing](https://en.wikipedia.org/wiki/A/B_testing)
+
+# Kolmogorov-Smirnov Tests
+
+## ks.test()
+
+```{r}
+
+x <- rnorm(50)
+y <- runif(30)
+# Do x and y come from the same distribution?
+ks.test(x, y)
+# Does x come from a shifted gamma distribution with shape 3 and rate 2?
+ks.test(x+2, "pgamma", 3, 2) # two-sided, exact
+ks.test(x+2, "pgamma", 3, 2, exact = FALSE)
+ks.test(x+2, "pgamma", 3, 2, alternative = "gr")
+
+# test if x is stochastically larger than x2
+x2 <- rnorm(50, -1)
+plot(ecdf(x), xlim = range(c(x, x2)))
+plot(ecdf(x2), add = TRUE, lty = "dashed")
+t.test(x, x2, alternative = "g")
+wilcox.test(x, x2, alternative = "g")
+ks.test(x, x2, alternative = "l")
+```
+
+# Chi-squared Test
+
+## chisq.test()
+
+```{r}
+## From Agresti(2007) p.39
+M <- as.table(rbind(c(762, 327, 468), c(484, 239, 477)))
+dimnames(M) <- list(gender = c("F", "M"),
+                    party = c("Democrat","Independent", "Republican"))
+(Xsq <- chisq.test(M))  # Prints test summary
+Xsq$observed   # observed counts (same as M)
+Xsq$expected   # expected counts under the null
+Xsq$residuals  # Pearson residuals
+Xsq$stdres     # standardized residuals
+
+
+## Effect of simulating p-values
+x <- matrix(c(12, 5, 7, 7), ncol = 2)
+chisq.test(x)$p.value           # 0.4233
+chisq.test(x, simulate.p.value = TRUE, B = 10000)$p.value
+                                # around 0.29!
+
+## Testing for population probabilities
+## Case A. Tabulated data
+x <- c(A = 20, B = 15, C = 25)
+chisq.test(x)
+chisq.test(as.table(x))             # the same
+x <- c(89,37,30,28,2)
+p <- c(40,20,20,15,5)
+try(
+chisq.test(x, p = p)                # gives an error
+)
+chisq.test(x, p = p, rescale.p = TRUE)
+                                # works
+p <- c(0.40,0.20,0.20,0.19,0.01)
+                                # Expected count in category 5
+                                # is 1.86 < 5 ==> chi square approx.
+chisq.test(x, p = p)            #               maybe doubtful, but is ok!
+chisq.test(x, p = p, simulate.p.value = TRUE)
+
+## Case B. Raw data
+x <- trunc(5 * runif(100))
+chisq.test(table(x))            # NOT 'chisq.test(x)'!
+```
+
+# Student's t-Test
+
+## t.test()
+```{r}
+require(graphics)
+
+t.test(1:10, y = c(7:20))      # P = .00001855
+t.test(1:10, y = c(7:20, 200)) # P = .1245    -- NOT significant anymore
+
+## Classical example: Student's sleep data
+plot(extra ~ group, data = sleep)
+## Formula interface
+t.test(extra ~ group, data = sleep)
+ggplot(sleep)+geom_density(aes(x=extra,fill=group),alpha=0.3,position = "identity")
+
+```
+
+
+# Student's t-Test
+
+## wilcox.test()
+```{r}
+wilcox.test()
+```
+
+
+```{r, echo=FALSE}
+```
+
+# Personal test groups
+## Normal distribution
+
+```{r normal_distribution}
+n <- 100
+norm_data <- data.frame(id=1:n,x=rnorm(n),x_=rnorm(n),y=rnorm(n,0.5,1.5),y_=rnorm(n,3,5))
+norm_data_sort<- data.frame(id=1:n,x=cumsum( sort(norm_data$x) ),x_=cumsum(sort(norm_data$x_)),y=cumsum( sort(norm_data$y)),y_=cumsum( sort(norm_data$y_) ) )
+
+ks.tests     <- sapply( norm_data[,-c(1)] , function(x){ ks.test( norm_data$x , x ) } )
+t.tests      <- sapply( norm_data[,-c(1)] , function(x){ t.test ( norm_data$x , x ) } ) # con pocos datos, si no todo passa como normal
+chisq.tests  <- sapply( norm_data[,-c(1)] , function(x){ chisq.test ( norm_data$x , x ,correct = F ) } )
+wilcox.tests <- sapply( norm_data[,-c(1)] , function(x){ wilcox.test( norm_data$x , x  ) } )
+
+
+ggplot( reshape2::melt(norm_data_sort,id.vars="id" ) ) + 
+  geom_point(aes(x=id,y=value,colour=variable) )
+
+ggplot(reshape2::melt(norm_data,id.vars="id" ))+
+         geom_density(aes(x=value,fill=variable),alpha=0.3,position = "identity" )
+```
+
+```{r uniform_distribution}
+n <- 100
+unif_data <- data.frame(id=1:n,x=runif(n),x_=runif(n),y=runif(n,0.5,1.5),y_=runif(n,3,5))
+unif_data_sort<- data.frame(id=1:n,x=cumsum( sort(unif_data$x) ),x_=cumsum(sort(unif_data$x_)),y=cumsum( sort(unif_data$y)),y_=cumsum( sort(unif_data$y_) ) )
+
+ks.tests     <- sapply( unif_data[,-c(1:2)] , function(x){ ks.test( unif_data$x , x ) } )
+t.tests      <- sapply( unif_data[,-c(1:2)] , function(x){ t.test ( unif_data$x , x ) } )
+chisq.tests  <- sapply( unif_data[,-c(1:2)] , function(x){ chisq.test ( unif_data$x , x ,correct = F ) } )
+wilcox.tests <- sapply( unif_data[,-c(1:2)] , function(x){ wilcox.test( unif_data$x , x  ) } )
+
+
+ggplot( reshape2::melt(unif_data_sort,id.vars="id" ) ) + 
+  geom_point(aes(x=id,y=value,colour=variable) )
+
+ggplot(reshape2::melt(unif_data,id.vars="id" ))+
+         geom_density(aes(x=value,fill=variable),alpha=0.3,position = "identity" )
+```
+
+```{r exponential_distribution}
+n <- 100
+exp_data <- data.frame(id=1:n,x=rexp(n),x_=rexp(n),y=rexp(n,1.5),y_=rexp(n,3))
+exp_data_sort<- data.frame(id=1:n,x=cumsum( sort(exp_data$x) ),x_=cumsum(sort(exp_data$x_)),y=cumsum( sort(exp_data$y)),y_=cumsum( sort(exp_data$y_) ) )
+
+ks.tests     <- sapply( exp_data[,-c(1:2)] , function(x){ ks.test( exp_data$x , x ) } )
+t.tests      <- sapply( exp_data[,-c(1:2)] , function(x){ t.test ( exp_data$x , x ) } )
+chisq.tests  <- sapply( exp_data[,-c(1:2)] , function(x){ chisq.test ( exp_data$x , x ,correct = F ) } )
+wilcox.tests <- sapply( exp_data[,-c(1:2)] , function(x){ wilcox.test( exp_data$x , x  ) } )
+
+
+ggplot( reshape2::melt(exp_data_sort,id.vars="id" ) ) + 
+  geom_point(aes(x=id,y=value,colour=variable) )
+
+ggplot(reshape2::melt(exp_data,id.vars="id" ))+
+         geom_density(aes(x=value,fill=variable),alpha=0.3,position = "identity" )
+```
+
+```{r log-norm_distribution}
+n <- 100
+lnorm_data <- data.frame(id=1:n,x=rlnorm(n),x_=rlnorm(n),y=rlnorm(n,0.5,1.5),y_=rlnorm(n,3,2))
+lnorm_data_sort<- data.frame(id=1:n,x=cumsum( sort(lnorm_data$x) ),x_=cumsum(sort(lnorm_data$x_)),y=cumsum( sort(lnorm_data$y)),y_=cumsum( sort(lnorm_data$y_) ) )
+
+ks.tests     <- sapply( lnorm_data[,-c(1:2)] , function(x){ ks.test( lnorm_data$x , x ) } )
+t.tests      <- sapply( lnorm_data[,-c(1:2)] , function(x){ t.test ( lnorm_data$x , x ) } )
+chisq.tests  <- sapply( lnorm_data[,-c(1:2)] , function(x){ chisq.test ( lnorm_data$x , x ,correct = F ) } )
+wilcox.tests <- sapply( lnorm_data[,-c(1:2)] , function(x){ wilcox.test( lnorm_data$x , x  ) } )
+
+
+ggplot( reshape2::melt(lnorm_data_sort,id.vars="id" ) ) + 
+  geom_point(aes(x=id,y=value,colour=variable) )
+
+ggplot(reshape2::melt(lnorm_data,id.vars="id" ))+
+         geom_density(aes(x=value,fill=variable),alpha=0.3,position = "identity")+coord_cartesian()
+
+ggplot(reshape2::melt(lnorm_data,id.vars="id" ))+
+         geom_density(aes(x=log(value),fill=variable),alpha=0.3,position = "identity")+coord_cartesian()
+```
+
+# References
+
+http://www.physics.csbsju.edu/stats/KS-test.html
+http://www.itl.nist.gov/div898/handbook/eda/section3/eda35g.htm
+https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test
+https://en.wikipedia.org/wiki/Student%27s_t-test
+https://en.wikipedia.org/wiki/Chi-squared_test
